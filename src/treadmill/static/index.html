@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treadmill Productivity</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f4f2;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77766f;
+    --series-walking: #2a78d6;
+    --series-sitting: #eb6834;
+    --accent-bg: #e8f1fc;
+    --danger-bg: #fbe9e8;
+    --danger-text: #9c1f1e;
+    --warn-bg: #fdf3dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #33322f;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #9a998f;
+      --series-walking: #3987e5;
+      --series-sitting: #d95926;
+      --accent-bg: #16263a;
+      --danger-bg: #3a1716;
+      --danger-text: #f2a3a2;
+      --warn-bg: #3a2f12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--surface-0); color: var(--text-primary); }
+  main { max-width: 980px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+            padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+           background: var(--surface-1); color: var(--text-primary); cursor: pointer; }
+  button.primary { background: var(--series-walking); border-color: var(--series-walking); color: #fff; font-weight: 600; }
+  button.stop { background: var(--danger-text); border-color: var(--danger-text); color: var(--surface-1); font-weight: 600; }
+  button[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--series-walking); }
+  input { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px;
+          background: var(--surface-1); color: var(--text-primary); }
+  .banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-weight: 600; }
+  .banner.walking { background: var(--accent-bg); border: 2px solid var(--series-walking); font-size: 16px; }
+  .banner.error { background: var(--danger-bg); color: var(--danger-text); }
+  .error-inline { color: var(--danger-text); margin-top: 6px; }
+  .muted { color: var(--text-muted); }
+  .secondary { color: var(--text-secondary); }
+  .headline { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tile { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .tile .label { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .tile .score { font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tile .reason { font-size: 15px; padding: 10px 0; color: var(--text-secondary); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+  .verdict { font-size: 17px; font-weight: 600; margin: 12px 0 6px; }
+  .notes { margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  tr.during-walk td { background: var(--warn-bg); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .chart-box { position: relative; height: 240px; }
+  @media (max-width: 720px) { .two-col, .headline { grid-template-columns: 1fr; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Treadmill Productivity</h1>
+
+  <!-- 1. Status bar -->
+  <div id="aw-down" class="banner error" hidden>ActivityWatch isn't running, so results can't be calculated.</div>
+  <div id="walking-banner" class="banner walking" hidden></div>
+  <section class="row">
+    <button id="walk-toggle" class="primary">Start walking</button>
+    <span id="walk-error" class="error-inline"></span>
+  </section>
+
+  <!-- 2. Period picker -->
+  <section class="row" aria-label="Period">
+    <button data-preset="today" aria-pressed="true">Today</button>
+    <button data-preset="week" aria-pressed="false">Last 7 days</button>
+    <button data-preset="custom" aria-pressed="false">Custom</button>
+    <span id="custom-range" class="row" hidden>
+      <input type="date" id="start-date"> to <input type="date" id="end-date">
+    </span>
+    <span id="period-label" class="muted"></span>
+  </section>
+
+  <div id="report-error" class="banner error" hidden></div>
+
+  <div id="results">
+    <!-- 3. Headline -->
+    <section>
+      <h2>Estimated productivity</h2>
+      <div class="headline">
+        <div class="tile">
+          <div class="label"><span class="swatch" style="background:var(--series-walking)"></span>Walking</div>
+          <div id="walking-score"></div>
+        </div>
+        <div class="tile">
+          <div class="label"><span class="swatch" style="background:var(--series-sitting)"></span>Assumed sitting
+            <span class="muted">(active time outside walking sessions)</span></div>
+          <div id="sitting-score"></div>
+        </div>
+      </div>
+      <div id="verdict" class="verdict"></div>
+      <ul class="notes">
+        <li>Score = average effort weight per rated active minute (none 0, low 1, medium 2, high 3). Unrated time is left out of the average.</li>
+        <li>It reflects <em>what</em> you worked on, not how intensely: the same app always scores the same.</li>
+        <li>Passive video counts as idle (no input for 3 minutes), so video time is under-counted.</li>
+      </ul>
+    </section>
+
+    <!-- 4. Categories -->
+    <section>
+      <h2>Time by effort category</h2>
+      <div class="two-col">
+        <table id="category-table"></table>
+        <div class="chart-box"><canvas id="category-chart" aria-label="Minutes by category, walking vs assumed sitting" role="img"></canvas></div>
+      </div>
+    </section>
+
+    <!-- 5. Apps -->
+    <section>
+      <h2>Time by app</h2>
+      <table id="app-table"></table>
+      <button id="apps-toggle" hidden style="margin-top:8px"></button>
+    </section>
+
+    <!-- 6. Coverage -->
+    <section>
+      <h2>Coverage</h2>
+      <div id="coverage"></div>
+      <table id="gap-table"></table>
+    </section>
+  </div>
+
+  <!-- 7. Sessions -->
+  <section>
+    <h2>Walking sessions</h2>
+    <table id="sessions"></table>
+    <div id="sessions-error" class="error-inline"></div>
+  </section>
+</main>
+<script src="chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

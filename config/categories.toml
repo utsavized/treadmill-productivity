@@ -1,0 +1,52 @@
+# Effort categories (spec §3, D20, D22).
+# Rules are checked top to bottom; the first match wins.
+# `app` is an exact app name (string or list). `title_contains` is optional,
+# case-insensitive, and matches if any item is in the window title.
+# Apps that match no rule are unrated and left out of the average.
+# Edits apply immediately, to past periods too (D29).
+
+[weights]
+none = 0
+low = 1
+medium = 2
+high = 3
+
+# --- Microsoft Edge: by window title ---
+
+[[rules]]
+app = "Microsoft Edge"
+title_contains = ["YouTube", "Netflix"]
+category = "none"
+
+[[rules]]
+app = "Microsoft Edge"
+title_contains = ["Claude", "ChatGPT"]
+category = "medium"
+
+[[rules]]
+app = "Microsoft Edge"
+title_contains = ["Superhuman", "Outlook"]
+category = "low"
+
+# General web browsing (D20)
+[[rules]]
+app = "Microsoft Edge"
+category = "none"
+
+# --- Apps ---
+
+[[rules]]
+app = ["Claude", "ChatGPT"]
+category = "medium"
+
+[[rules]]
+app = ["Superhuman", "Mail", "Microsoft Outlook", "Slack", "Messages"]
+category = "low"
+
+[[rules]]
+app = ["Code", "DaVinci Resolve", "Terminal", "iTerm2"]
+category = "high"
+
+[[rules]]
+app = ["Finder", "System Settings", "QuickTime Player"]
+category = "none"
